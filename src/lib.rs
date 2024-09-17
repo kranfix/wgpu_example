@@ -1,5 +1,6 @@
 mod texture;
 
+use anyhow::{Context, Result};
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
@@ -12,7 +13,7 @@ use winit::{
 use wasm_bindgen::prelude::*;
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-pub async fn run() {
+pub async fn run() -> Result<()> {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -23,11 +24,11 @@ pub async fn run() {
         }
     }
 
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = EventLoop::new().context("Failed at creating eventloop")?;
     let window = WindowBuilder::new()
         .with_title("Shaders")
         .build(&event_loop)
-        .unwrap();
+        .context("Window can not be created")?;
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -48,7 +49,7 @@ pub async fn run() {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let mut state = State::new(&window).await;
+    let mut state = State::new(&window).await?;
 
     event_loop
         .run(move |event, control_flow| {
@@ -96,7 +97,9 @@ pub async fn run() {
                 _ => {}
             }
         })
-        .unwrap();
+        .context("Evenloop fails running")?;
+
+    Ok(())
 }
 
 struct State<'a> {
@@ -121,7 +124,7 @@ struct State<'a> {
 
 impl<'a> State<'a> {
     // Creating some of the wgpu types requires async code
-    async fn new(window: &'a Window) -> State<'a> {
+    async fn new(window: &'a Window) -> Result<State<'a>> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -134,7 +137,9 @@ impl<'a> State<'a> {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance
+            .create_surface(window)
+            .context("Failed at creating surface")?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -143,7 +148,7 @@ impl<'a> State<'a> {
                 force_fallback_adapter: false,
             })
             .await
-            .unwrap();
+            .context("Failed at creating adapter")?;
         // let adapter = instance
         //     .enumerate_adapters(wgpu::Backends::all())
         //     .into_iter()
@@ -171,7 +176,7 @@ impl<'a> State<'a> {
                 None, // Trace path
             )
             .await
-            .unwrap();
+            .context("Failed at requesting device")?;
 
         let surface_caps = surface.get_capabilities(&adapter);
         // Shader code in this tutorial assumes an sRGB surface texture. Using a different
@@ -221,7 +226,7 @@ impl<'a> State<'a> {
 
         let diffuse_bytes = include_bytes!("happy-tree.png");
         let diffuse_texture =
-            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap();
+            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -312,7 +317,7 @@ impl<'a> State<'a> {
             cache: None,     // 6.
         });
 
-        Self {
+        Ok(Self {
             window,
             surface,
             device,
@@ -326,7 +331,7 @@ impl<'a> State<'a> {
             num_indices,
             diffuse_bind_group,
             diffuse_texture,
-        }
+        })
     }
 
     pub fn window(&self) -> &Window {
