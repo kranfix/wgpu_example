@@ -50,7 +50,6 @@ pub async fn run() {
 
     let mut state = State::new(&window).await;
 
-    log::info!("MARK 4");
     event_loop
         .run(move |event, control_flow| {
             match event {
