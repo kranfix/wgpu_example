@@ -1,6 +1,5 @@
-use anyhow::Result;
-use wgpu_example::run;
+use wgpu_example::{run, RunError};
 
-fn main() -> Result<()> {
+fn main() -> Result<(), RunError> {
     pollster::block_on(run())
 }

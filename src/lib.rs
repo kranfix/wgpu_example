@@ -1,10 +1,9 @@
-mod errany;
 mod state;
 mod texture;
 
-use anyhow::Context;
-use state::{State, Vertex};
+use state::{State, StateCreationError, Vertex};
 use winit::{
+    error::EventLoopError,
     event::*,
     event_loop::EventLoop,
     keyboard::{KeyCode, PhysicalKey},
@@ -19,7 +18,19 @@ pub async fn run_wams() {
     run().await.expect("Error")
 }
 
-pub async fn run() -> anyhow::Result<()> {
+#[derive(Debug, thiserror::Error)]
+pub enum RunError {
+    #[error("Failed at creating eventloop")]
+    EventLoopCreationError(EventLoopError),
+    #[error("Window can not be created")]
+    BuildWindowError,
+    #[error("State can not be created")]
+    StateCreationError(StateCreationError),
+    #[error("Evenloop fails running")]
+    EventLoopRunningError,
+}
+
+pub async fn run() -> anyhow::Result<(), RunError> {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -30,11 +41,11 @@ pub async fn run() -> anyhow::Result<()> {
         }
     }
 
-    let event_loop = EventLoop::new().context("Failed at creating eventloop")?;
+    let event_loop = EventLoop::new().map_err(|err| RunError::EventLoopCreationError(err))?;
     let window = WindowBuilder::new()
         .with_title("Shaders")
         .build(&event_loop)
-        .context("Window can not be created")?;
+        .map_err(|_| RunError::BuildWindowError)?;
 
     #[cfg(target_arch = "wasm32")]
     {
@@ -55,7 +66,9 @@ pub async fn run() -> anyhow::Result<()> {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let mut state = State::new(&window, VERTICES, INDICES).await?;
+    let mut state = State::new(&window, VERTICES, INDICES)
+        .await
+        .map_err(|err| RunError::StateCreationError(err))?;
 
     event_loop
         .run(move |event, control_flow| {
@@ -103,7 +116,7 @@ pub async fn run() -> anyhow::Result<()> {
                 _ => {}
             }
         })
-        .context("Evenloop fails running")?;
+        .map_err(|_| RunError::EventLoopRunningError)?;
 
     Ok(())
 }
