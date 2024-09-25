@@ -1,8 +1,19 @@
-use anyhow::{Context, Result};
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, CreateSurfaceError, RequestDeviceError};
 use winit::{event::WindowEvent, window::Window};
 
-use crate::texture;
+use crate::texture::{self, CreateTextureFromBytesError};
+
+#[derive(Debug, thiserror::Error)]
+pub enum StateCreationError {
+    #[error("Failed at creating surface")]
+    CreateSurfaceError(CreateSurfaceError),
+    #[error("Failed at creating adapter")]
+    CreateAdapterError,
+    #[error("Failed at requesting device")]
+    RequestDeviceError(RequestDeviceError),
+    #[error("Failed at creating texture")]
+    CreateTexture(CreateTextureFromBytesError),
+}
 
 pub struct State<'a> {
     // The window must be declared after the surface so
@@ -17,10 +28,12 @@ pub struct State<'a> {
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    #[allow(dead_code)]
     num_vertices: u32,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
     diffuse_bind_group: wgpu::BindGroup,
+    #[allow(dead_code)]
     diffuse_texture: texture::Texture,
 }
 
@@ -30,7 +43,7 @@ impl<'a> State<'a> {
         window: &'a Window,
         vertices: &[Vertex],
         indices: &[u16],
-    ) -> Result<State<'a>> {
+    ) -> Result<State<'a>, StateCreationError> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -45,7 +58,7 @@ impl<'a> State<'a> {
 
         let surface = instance
             .create_surface(window)
-            .context("Failed at creating surface")?;
+            .map_err(|err| StateCreationError::CreateSurfaceError(err))?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -54,7 +67,7 @@ impl<'a> State<'a> {
                 force_fallback_adapter: false,
             })
             .await
-            .context("Failed at creating adapter")?;
+            .ok_or(StateCreationError::CreateAdapterError)?;
         // let adapter = instance
         //     .enumerate_adapters(wgpu::Backends::all())
         //     .into_iter()
@@ -82,7 +95,7 @@ impl<'a> State<'a> {
                 None, // Trace path
             )
             .await
-            .context("Failed at requesting device")?;
+            .map_err(|err| StateCreationError::RequestDeviceError(err))?;
 
         let surface_caps = surface.get_capabilities(&adapter);
         // Shader code in this tutorial assumes an sRGB surface texture. Using a different
@@ -132,7 +145,8 @@ impl<'a> State<'a> {
 
         let diffuse_bytes = include_bytes!("happy-tree.png");
         let diffuse_texture =
-            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
+            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")
+                .map_err(|err| StateCreationError::CreateTexture(err))?;
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

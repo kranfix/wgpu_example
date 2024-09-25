@@ -1,5 +1,4 @@
-use anyhow::*;
-use image::GenericImageView;
+use image::{GenericImageView, ImageError};
 
 pub struct Texture {
     #[allow(unused)]
@@ -8,15 +7,23 @@ pub struct Texture {
     pub sampler: wgpu::Sampler,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum CreateTextureFromBytesError {
+    #[error("Error loading form memory: {0}")]
+    ImageError(ImageError),
+}
+
 impl Texture {
     pub fn from_bytes(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         bytes: &[u8],
         label: &str,
-    ) -> Result<Self> {
-        let img = image::load_from_memory(bytes)?;
-        Self::from_image(device, queue, &img, Some(label))
+    ) -> Result<Self, CreateTextureFromBytesError> {
+        let img = image::load_from_memory(bytes)
+            .map_err(|err| CreateTextureFromBytesError::ImageError(err))?;
+        let texture = Self::from_image(device, queue, &img, Some(label));
+        Ok(texture)
     }
 
     pub fn from_image(
@@ -24,7 +31,7 @@ impl Texture {
         queue: &wgpu::Queue,
         img: &image::DynamicImage,
         label: Option<&str>,
-    ) -> Result<Self> {
+    ) -> Self {
         let rgba = img.to_rgba8();
         let dimensions = img.dimensions();
 
@@ -71,10 +78,10 @@ impl Texture {
             ..Default::default()
         });
 
-        Ok(Self {
+        Self {
             texture,
             view,
             sampler,
-        })
+        }
     }
 }

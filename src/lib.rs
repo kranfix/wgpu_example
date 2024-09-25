@@ -2,7 +2,7 @@ mod errany;
 mod state;
 mod texture;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use state::{State, Vertex};
 use winit::{
     event::*,
@@ -19,7 +19,7 @@ pub async fn run_wams() {
     run().await.expect("Error")
 }
 
-pub async fn run() -> Result<()> {
+pub async fn run() -> anyhow::Result<()> {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
