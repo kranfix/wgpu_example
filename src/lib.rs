@@ -55,7 +55,7 @@ pub async fn run() -> Result<()> {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let mut state = State::new(&window, VERTICES).await?;
+    let mut state = State::new(&window, VERTICES, INDICES).await?;
 
     event_loop
         .run(move |event, control_flow| {

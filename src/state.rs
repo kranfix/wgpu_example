@@ -24,11 +24,13 @@ pub struct State<'a> {
     diffuse_texture: texture::Texture,
 }
 
-enum StateCreationError {}
-
 impl<'a> State<'a> {
     // Creating some of the wgpu types requires async code
-    pub async fn new(window: &'a Window, vertices: &[Vertex]) -> Result<State<'a>> {
+    pub async fn new(
+        window: &'a Window,
+        vertices: &[Vertex],
+        indices: &[u16],
+    ) -> Result<State<'a>> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -121,10 +123,10 @@ impl<'a> State<'a> {
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(vertices),
+            contents: bytemuck::cast_slice(indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let num_indices = vertices.len() as u32;
+        let num_indices = indices.len() as u32;
 
         surface.configure(&device, &config);
 
